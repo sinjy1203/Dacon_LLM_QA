@@ -1,0 +1,12 @@
+run_name: EEVE-completed-only
+model_id: yanolja/EEVE-Korean-Instruct-10.8B-v1.0
+resume: False
+
+lora_target_modules: ["q_proj", "v_proj"]
+lora_r: 16
+lora_alpha: 32
+
+epochs: 5
+batch_size: 2
+gradient_accumulation_steps: 16
+lr: 0.00001
