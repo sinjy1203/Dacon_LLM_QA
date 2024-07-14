@@ -3,9 +3,8 @@ PROMPT_TEMPLATE = """A chat between a curious user and an artificial intelligenc
 {context}
 ### Human:
 {question}
+### Assistant:
 """
-
-RESPONSE_TEMPLATE = "### Assistant:\n"
 
 TRAIN_CONFIG_PATH = "../configs/train.yaml"
 
@@ -13,3 +12,5 @@ TRAIN_DATA_PATH = "../data/train.csv"
 TEST_DATA_PATH = "../data/test.csv"
 
 OUTPUT_DIR = "../results/"
+
+IGNORE_INDEX = -100

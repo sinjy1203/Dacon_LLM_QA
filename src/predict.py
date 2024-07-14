@@ -6,7 +6,7 @@ from transformers import (
 )
 from peft import PeftModel
 
-from constants import PROMPT_TEMPLATE, RESPONSE_TEMPLATE
+from constants import PROMPT_TEMPLATE
 
 
 def predict(df, model_id, model_path):
@@ -22,7 +22,7 @@ def predict(df, model_id, model_path):
     tokenizer = AutoTokenizer.from_pretrained(model_id)
 
     output_texts = []
-    template = PROMPT_TEMPLATE + RESPONSE_TEMPLATE
+    template = PROMPT_TEMPLATE
     for _, row in tqdm(df.iterrows(), total=len(df), desc="Predicting"):
         query = row.to_dict()
         input_ids = tokenizer(template.format(**query), return_tensors="pt").input_ids

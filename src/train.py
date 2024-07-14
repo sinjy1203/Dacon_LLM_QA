@@ -2,7 +2,8 @@ import os
 import yaml
 import argparse
 import torch
-from datasets import Dataset
+
+# from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 from transformers import (
     TrainingArguments,
@@ -10,7 +11,9 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
 )
-from trl import SFTTrainer
+
+# from trl import SFTTrainer
+from transformers import Trainer
 import wandb
 
 from predict import predict
@@ -21,6 +24,7 @@ from utils import (
     calculate_f1_score,
 )
 from constants import TRAIN_CONFIG_PATH, OUTPUT_DIR, TRAIN_DATA_PATH
+from dataset import QADataset, QADataCollator
 
 os.environ["WANDB_LOG_MODEL"] = "checkpoint"
 
@@ -37,10 +41,13 @@ def main(config):
 
     tokenizer = AutoTokenizer.from_pretrained(config["model_id"])
 
-    train_df, val_df = load_train_val_data(TRAIN_DATA_PATH, tokenizer)
-    train_dataset, val_dataset = Dataset.from_pandas(train_df), Dataset.from_pandas(
-        val_df
-    )
+    train_df, val_df = load_train_val_data(TRAIN_DATA_PATH)
+    # train_dataset, val_dataset = Dataset.from_pandas(train_df), Dataset.from_pandas(
+    #     val_df
+    # )
+    train_dataset = QADataset(train_df, tokenizer=tokenizer)
+    val_dataset = QADataset(val_df, tokenizer=tokenizer)
+    data_collator = QADataCollator(tokenizer=tokenizer)
 
     lora_config = LoraConfig(
         r=config["lora_r"],
@@ -84,14 +91,21 @@ def main(config):
     )
     model = get_peft_model(model, lora_config)
 
-    trainer = SFTTrainer(
-        model,
-        tokenizer=tokenizer,
+    # trainer = SFTTrainer(
+    #     model,
+    #     tokenizer=tokenizer,
+    #     train_dataset=train_dataset,
+    #     eval_dataset=val_dataset,
+    #     dataset_text_field="prompt",
+    #     max_seq_length=1024,
+    #     args=training_args,
+    # )
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
-        dataset_text_field="prompt",
-        max_seq_length=1024,
-        args=training_args,
     )
 
     trainer.train(resume_from_checkpoint=config["resume"])

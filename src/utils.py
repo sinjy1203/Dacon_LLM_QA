@@ -4,23 +4,21 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
-from constants import PROMPT_TEMPLATE, RESPONSE_TEMPLATE
 
-
-def load_train_val_data(path, tokenizer):
+def load_train_val_data(path):
     np.random.seed(1203)
 
     df = pd.read_csv(path)
-    df["prompt"] = df.apply(
-        lambda row: PROMPT_TEMPLATE.format(
-            context=row.context.replace("\n\n", " ").replace("\n", " "),
-            question=row.question,
-        )
-        + RESPONSE_TEMPLATE
-        + row.answer
-        + tokenizer.eos_token,
-        axis=1,
-    )
+    # df["prompt"] = df.apply(
+    #     lambda row: PROMPT_TEMPLATE.format(
+    #         context=row.context.replace("\n\n", " ").replace("\n", " "),
+    #         question=row.question,
+    #     )
+    #     + RESPONSE_TEMPLATE
+    #     + row.answer
+    #     + tokenizer.eos_token,
+    #     axis=1,
+    # )
 
     idxs = np.arange(len(df))
     np.random.shuffle(idxs)
