@@ -1,4 +1,6 @@
+import yaml
 from tqdm import tqdm
+import pandas as pd
 import torch
 from transformers import (
     AutoModelForCausalLM,
@@ -6,7 +8,13 @@ from transformers import (
 )
 from peft import PeftModel
 
-from constants import PROMPT_TEMPLATE
+from constants import (
+    PROMPT_TEMPLATE,
+    PREDICT_CONFIG_PATH,
+    TEST_DATA_PATH,
+    OUTPUT_DIR,
+)
+from utils import output_parsing, get_latest_checkpoint
 
 
 def predict(df, model_id, model_path):
@@ -42,3 +50,23 @@ def predict(df, model_id, model_path):
         output_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)[0]
         output_texts += [output_text]
     return output_texts
+
+
+def main(config):
+    test_df = pd.read_csv(TEST_DATA_PATH)
+    preds = predict(
+        test_df,
+        config["model_id"],
+        get_latest_checkpoint(OUTPUT_DIR + config["run_name"]),
+    )
+    test_df["answer"] = preds
+    test_df.to_csv(OUTPUT_DIR + config["run_name"] + "/test_df.csv", index=False)
+    test_df["answer"] = test_df["answer"].apply(output_parsing)
+    test_df = test_df.drop(["context", "question"], axis=1)
+    test_df.to_csv(OUTPUT_DIR + config["run_name"] + "/submission.csv", index=False)
+
+
+if __name__ == "__main__":
+    with open(PREDICT_CONFIG_PATH) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+    main(config)

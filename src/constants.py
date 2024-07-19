@@ -7,6 +7,7 @@ PROMPT_TEMPLATE = """A chat between a curious user and an artificial intelligenc
 """
 
 TRAIN_CONFIG_PATH = "../configs/train.yaml"
+PREDICT_CONFIG_PATH = "../configs/predict.yaml"
 
 TRAIN_DATA_PATH = "../data/train.csv"
 TEST_DATA_PATH = "../data/test.csv"
