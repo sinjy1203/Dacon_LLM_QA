@@ -6,7 +6,7 @@ from torch.utils.data import Dataset
 from transformers import PreTrainedTokenizer, AutoTokenizer
 
 from utils import load_train_val_data
-from constants import PROMPT_TEMPLATE, IGNORE_INDEX
+from constants import PROMPT_TEMPLATE, IGNORE_INDEX, TARGET_TEMPLATE
 
 
 class QADataset(Dataset):
@@ -21,7 +21,9 @@ class QADataset(Dataset):
             axis=1,
         ).to_list()
         targets = df.apply(
-            lambda row: row.answer + tokenizer.eos_token, axis=1
+            lambda row: TARGET_TEMPLATE.format(reason=row.reason, answer=row.answer)
+            + tokenizer.eos_token,
+            axis=1,
         ).to_list()
 
         sr_tgs = [s + t for s, t in zip(sources, targets)]
@@ -68,9 +70,6 @@ class QADataCollator(object):
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         input_ids = [{"input_ids": instance["input_ids"]} for instance in instances]
         labels = [{"input_ids": instance["labels"]} for instance in instances]
-        # input_ids, labels = tuple(
-        #     [instance[key] for instance in instances] for key in ("input_ids", "labels")
-        # )
         batch_data = self.tokenizer.pad(input_ids)
         batch_data["labels"] = self.tokenizer.pad(labels)["input_ids"]
         batch_data["labels"][

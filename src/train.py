@@ -2,8 +2,6 @@ import os
 import yaml
 import argparse
 import torch
-
-# from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 from transformers import (
     TrainingArguments,
@@ -11,22 +9,18 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
 )
-
-# from trl import SFTTrainer
+from transformers import DataCollatorWithPadding
 from transformers import Trainer
 import wandb
 
-from predict import predict
 from utils import (
     load_train_val_data,
-    output_parsing,
-    get_latest_checkpoint,
-    calculate_f1_score,
 )
 from constants import TRAIN_CONFIG_PATH, OUTPUT_DIR, TRAIN_DATA_PATH
-from dataset import QADataset, QADataCollator
+from dataset import QADataset
 
 os.environ["WANDB_LOG_MODEL"] = "checkpoint"
+torch.cuda.empty_cache()
 
 
 def get_args():
@@ -41,13 +35,10 @@ def main(config):
 
     tokenizer = AutoTokenizer.from_pretrained(config["model_id"])
 
-    train_df, val_df = load_train_val_data(TRAIN_DATA_PATH)
-    # train_dataset, val_dataset = Dataset.from_pandas(train_df), Dataset.from_pandas(
-    #     val_df
-    # )
+    train_df = load_train_val_data(TRAIN_DATA_PATH)
+
     train_dataset = QADataset(train_df, tokenizer=tokenizer)
-    val_dataset = QADataset(val_df, tokenizer=tokenizer)
-    data_collator = QADataCollator(tokenizer=tokenizer)
+    data_collator = DataCollatorWithPadding(tokenizer, padding=True)
 
     lora_config = LoraConfig(
         r=config["lora_r"],
@@ -62,11 +53,10 @@ def main(config):
         run_name=config["run_name"],
         output_dir=OUTPUT_DIR + config["run_name"],
         save_strategy="epoch",
-        evaluation_strategy="epoch",
         num_train_epochs=config["epochs"],
         per_device_train_batch_size=config["batch_size"],
         gradient_accumulation_steps=config["gradient_accumulation_steps"],
-        optim="adamw_hf",
+        optim="paged_adamw_8bit",
         learning_rate=config["lr"],
         fp16=True,
         max_grad_norm=0.3,
@@ -74,6 +64,8 @@ def main(config):
         group_by_length=True,
         lr_scheduler_type="linear",
         report_to="wandb",
+        do_eval=False,
+        evaluation_strategy="no",
     )
 
     nf4_config = BitsAndBytesConfig(
@@ -91,37 +83,15 @@ def main(config):
     )
     model = get_peft_model(model, lora_config)
 
-    # trainer = SFTTrainer(
-    #     model,
-    #     tokenizer=tokenizer,
-    #     train_dataset=train_dataset,
-    #     eval_dataset=val_dataset,
-    #     dataset_text_field="prompt",
-    #     max_seq_length=1024,
-    #     args=training_args,
-    # )
     trainer = Trainer(
         model=model,
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_dataset,
-        eval_dataset=val_dataset,
     )
 
     trainer.train(resume_from_checkpoint=config["resume"])
 
-    val_df["response"] = predict(
-        val_df,
-        config["model_id"],
-        get_latest_checkpoint(OUTPUT_DIR + config["run_name"]),
-    )
-    val_df.to_csv(OUTPUT_DIR + config["run_name"] + "/val_df.csv", index=False)
-    val_df["response"] = val_df["response"].apply(output_parsing)
-    val_df["f1"] = val_df.apply(
-        lambda row: calculate_f1_score(row.response, row.answer), axis=1
-    )
-
-    wandb.log({"val_f1": val_df["f1"].mean(), "val_dxf": val_df} | config)
     wandb.finish()
 
 

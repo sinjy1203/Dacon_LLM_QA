@@ -3,32 +3,56 @@ import re
 from collections import Counter
 import numpy as np
 import pandas as pd
+from typing import Any, Dict, List
+from uuid import UUID
+from tqdm.auto import tqdm
+from langchain.schema.output import LLMResult
+from langchain_core.callbacks import BaseCallbackHandler
 
 
-def load_train_val_data(path):
+class BatchCallback(BaseCallbackHandler):
+    def __init__(self, total: int, desc):
+        super().__init__()
+        self.count = 0
+        self.progress_bar = tqdm(total=total, desc=desc)  # define a progress bar
+
+    # Override on_llm_end method. This is called after every response from LLM
+    def on_llm_end(
+        self,
+        response: LLMResult,
+        *,
+        run_id: UUID,
+        parent_run_id: UUID | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        self.count += 1
+        self.progress_bar.update(1)
+
+    def __enter__(self):
+        self.progress_bar.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self.progress_bar.__exit__(exc_type, exc_value, exc_traceback)
+
+    def __del__(self):
+        self.progress_bar.__del__()
+
+
+def load_train_val_data(path, validate):
     np.random.seed(1203)
 
     df = pd.read_csv(path)
-    # df["prompt"] = df.apply(
-    #     lambda row: PROMPT_TEMPLATE.format(
-    #         context=row.context.replace("\n\n", " ").replace("\n", " "),
-    #         question=row.question,
-    #     )
-    #     + RESPONSE_TEMPLATE
-    #     + row.answer
-    #     + tokenizer.eos_token,
-    #     axis=1,
-    # )
 
     idxs = np.arange(len(df))
     np.random.shuffle(idxs)
 
-    train_df, val_df = df.loc[idxs[:-1000]], df.loc[idxs[-1000:]]
-    return train_df, val_df
+    train_df = df.loc[idxs]
+    return train_df
 
 
 def output_parsing(text):
-    pattern = r"### Assistant:\n(.*?)<\|im_end\|>"
+    pattern = r"### Answer:\n(.*?)<\|im_end\|>"
 
     # 패턴 찾기
     match = re.search(pattern, text, re.DOTALL)
@@ -54,8 +78,9 @@ def get_latest_checkpoint(checkpoints_dir):
         key=lambda x: int(checkpoint_pattern.search(os.path.basename(x)).group(1)),
         reverse=True,
     )
-
-    return checkpoint_dirs[0] if checkpoint_dirs else None
+    checkpoint_path = checkpoint_dirs[0] if checkpoint_dirs else None
+    print(f"latest checkpoint path: {checkpoint_path}")
+    return checkpoint_path
 
 
 def calculate_f1_score(prediction, ground_truth):

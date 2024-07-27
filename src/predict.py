@@ -1,5 +1,5 @@
-import yaml
 from tqdm import tqdm
+import yaml
 import pandas as pd
 import torch
 from transformers import (
@@ -37,11 +37,8 @@ def predict(df, model_id, model_path):
 
         outputs = model.generate(
             input_ids,
-            max_new_tokens=100,
+            max_length=4000,
             eos_token_id=[
-                tokenizer.convert_tokens_to_ids("#"),
-                tokenizer.convert_tokens_to_ids("##"),
-                tokenizer.convert_tokens_to_ids("###"),
                 tokenizer.eos_token_id,
             ],
             pad_token_id=tokenizer.pad_token_id,
