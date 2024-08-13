@@ -39,7 +39,7 @@ class BatchCallback(BaseCallbackHandler):
         self.progress_bar.__del__()
 
 
-def load_train_val_data(path, validate):
+def load_train_data(path):
     np.random.seed(1203)
 
     df = pd.read_csv(path)
@@ -53,6 +53,8 @@ def load_train_val_data(path, validate):
 
 def output_parsing(text):
     pattern = r"### Answer:\n(.*?)<\|im_end\|>"
+    # pattern = r"### Answer:\n(.*?)<eos>"
+    # pattern = r"답:\n(.*?)<end_of_turn>"
 
     # 패턴 찾기
     match = re.search(pattern, text, re.DOTALL)

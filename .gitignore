@@ -3,3 +3,5 @@ notebooks/
 .vscode/
 *.pyc
 __pycache__/
+results/
+.env

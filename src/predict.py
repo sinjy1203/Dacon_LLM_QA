@@ -8,12 +8,7 @@ from transformers import (
 )
 from peft import PeftModel
 
-from constants import (
-    PROMPT_TEMPLATE,
-    PREDICT_CONFIG_PATH,
-    TEST_DATA_PATH,
-    OUTPUT_DIR,
-)
+from constants import PROMPT_TEMPLATE, PREDICT_CONFIG_PATH, TEST_DATA_PATH, OUTPUT_DIR
 from utils import output_parsing, get_latest_checkpoint
 
 
@@ -27,6 +22,7 @@ def predict(df, model_id, model_path):
         torch_dtype=torch.bfloat16,
     )
     model = PeftModel.from_pretrained(base_model, model_path)
+    model.eval()
     tokenizer = AutoTokenizer.from_pretrained(model_id)
 
     output_texts = []
@@ -34,6 +30,7 @@ def predict(df, model_id, model_path):
     for _, row in tqdm(df.iterrows(), total=len(df), desc="Predicting"):
         query = row.to_dict()
         input_ids = tokenizer(template.format(**query), return_tensors="pt").input_ids
+        input_ids = input_ids.to(torch.device("cuda:0"))
 
         outputs = model.generate(
             input_ids,
@@ -44,6 +41,19 @@ def predict(df, model_id, model_path):
             pad_token_id=tokenizer.pad_token_id,
             do_sample=False,
         )
+
+        # outputs = model.generate(
+        #     input_ids,
+        #     max_length=4000,
+        #     eos_token_id=[
+        #         tokenizer.eos_token_id,
+        #     ],
+        #     pad_token_id=tokenizer.pad_token_id,
+        #     num_beams=3,
+        #     num_return_sequences=1,
+        #     remove_invalid_values=True,
+        # )
+
         output_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)[0]
         output_texts += [output_text]
     return output_texts
@@ -51,6 +61,9 @@ def predict(df, model_id, model_path):
 
 def main(config):
     test_df = pd.read_csv(TEST_DATA_PATH)
+    test_df["context"] = test_df["context"].apply(
+        lambda x: x.replace("\n\n", " ").replace("\n", " ").replace("  ", " ")
+    )
     preds = predict(
         test_df,
         config["model_id"],
